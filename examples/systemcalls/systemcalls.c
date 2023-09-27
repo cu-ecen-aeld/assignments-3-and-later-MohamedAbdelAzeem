@@ -16,8 +16,15 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    if(system(cmd) == 0)
+    {
+        return true;
+    }
+    else 
+    {
+        return false;
+    }
+ 
 }
 
 /**
@@ -43,6 +50,7 @@ bool do_exec(int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+        //printf("%s \n", command[i]);
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
@@ -58,6 +66,45 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+
+    int ChildPid = fork();
+
+    if(ChildPid < 0)
+    {   
+           perror("Fork Failed");
+           return false;
+    }
+    else if(ChildPid == 0)
+    {
+        //Child Process
+       
+        int r = execv(command[0], command);
+        if(r == -1)
+        {
+            perror("execv Failed in do_exec");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else
+    {
+        //Parent process
+        int status = 0; 
+        int r = wait(&status);
+        if(r == -1) 
+        {
+            perror("wait Failed");
+            return false;
+        }
+
+        if (WIFEXITED(status)) {
+            // Child process exited normally
+            return (WEXITSTATUS(status) == 0);
+        } else {
+            // Child process did not exit normally
+            return false;
+        }
+    }
+
 
     va_end(args);
 
@@ -92,6 +139,65 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+   
+    int oldfd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
+    if(oldfd < 0)
+    {
+        perror("open failed");
+        return false;
+    }
+           
+    //redirect standard out to a file 
+    if (dup2(oldfd, 1) == -1) {
+        /* Handle dup2() error */
+
+        close(oldfd);
+        perror("Dup2 failed");
+        return false;
+    }
+
+    close(oldfd);
+  
+    int ChildPid = fork();
+
+    if(ChildPid < 0)
+    {   
+        perror("Fork Failed");
+        return false;
+    }
+    else if(ChildPid == 0)
+    {
+        //Child Process
+        int r = execv(command[0], command);
+      
+        if(r == -1)
+        {
+            perror("execv Failed in do_exec_redirect");
+            exit(EXIT_FAILURE);
+        }   
+    }
+    else
+    {
+        //Parent process
+        int status = 0; 
+        int res = wait(&status);
+        if(res == -1) 
+        {
+            perror("wait Failed");
+            return false;
+        }
+
+        if (WIFEXITED(status)) {
+            // Child process exited normally
+            return (WEXITSTATUS(status) == 0);
+        } else {
+            // Child process did not exit normally
+            return false;
+        }
+    }
+
+
 
     va_end(args);
 
