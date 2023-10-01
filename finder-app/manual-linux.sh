@@ -91,9 +91,9 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 path_sysroot=$(aarch64-none-linux-gnu-gcc -print-sysroot)
 
 sudo cp ${path_sysroot}/lib/ld-linux-aarch64.so.1 lib 
-sudo cp ${path_sysroot}/libc/lib64/libm.so.6 lib64
-sudo cp ${path_sysroot}/libc/lib64/libresolv.so.2 lib64
-sudo cp ${path_sysroot}/libc/lib64/libc.so.6 lib64
+sudo cp ${path_sysroot}/lib64/libm.so.6 lib64
+sudo cp ${path_sysroot}/lib64/libresolv.so.2 lib64
+sudo cp ${path_sysroot}/lib64/libc.so.6 lib64
 
 echo "Library dependencies copied"
 
