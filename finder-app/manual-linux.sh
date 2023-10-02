@@ -104,7 +104,8 @@ sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
-cd /coursera/finder-app/
+
+cd ${FINDER_APP_DIR}
 
 make clean 
 make CROSS_COMPILE=aarch64-none-linux-gnu- 
