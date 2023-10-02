@@ -88,10 +88,12 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
-sudo cp /home/abdelazm/arm-cross-compiler/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib/ld-linux-aarch64.so.1 lib 
-sudo cp /home/abdelazm/arm-cross-compiler/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libm.so.6 lib64
-sudo cp /home/abdelazm/arm-cross-compiler/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libresolv.so.2 lib64
-sudo cp /home/abdelazm/arm-cross-compiler/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libc.so.6 lib64
+path_sysroot=$(aarch64-none-linux-gnu-gcc -print-sysroot)
+
+sudo cp ${path_sysroot}/lib/ld-linux-aarch64.so.1 lib 
+sudo cp ${path_sysroot}/lib64/libm.so.6 lib64
+sudo cp ${path_sysroot}/lib64/libresolv.so.2 lib64
+sudo cp ${path_sysroot}/lib64/libc.so.6 lib64
 
 echo "Library dependencies copied"
 
@@ -102,7 +104,8 @@ sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
-cd ~/coursera/finder-app/
+
+cd ${FINDER_APP_DIR}
 
 make clean 
 make CROSS_COMPILE=aarch64-none-linux-gnu- 
