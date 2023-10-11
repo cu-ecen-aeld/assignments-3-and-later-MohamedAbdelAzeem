@@ -1,18 +1,21 @@
-#defult compilter (Native compiler)
+CC = gcc
+CFLAGS = -Wall -Wextra
+TARGET = writer
+OBJFILES = writer.o
 
+ifdef CROSS_COMPILE
+    CC = $(CROSS_COMPILE)gcc
+endif
 
-CC = gcc 
- 
+.PHONY: all clean
 
-OUTPUT = writer
+all: $(TARGET)
 
-all: writer
-	echo "Building finder app"
-writer:	
-		$(CC) writer.c  -o $(OUTPUT)
+$(TARGET): $(OBJFILES)
+	$(CC) $(CFLAGS) -o $@ $^
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-		rm -f $(OUTPUT) 
-
-
-
+	rm -f $(TARGET) $(OBJFILES)
