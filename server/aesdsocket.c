@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        syslog(LOG_INFO, "Received data from %s: %s, %d", client_ip, buffer, (int)bytes_received);
+        // syslog(LOG_INFO, "Received data from %s: %s, %d", client_ip, buffer, (int)bytes_received);
 
         int reposition_status = lseek(data_fd, 0, SEEK_SET); // Reposition the read/write offset of the file to the beginning
         if (reposition_status == -1)
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
 
         while ((bytes_read = read(data_fd, buffer, sizeof(char) * BUFFER_SIZE)) > 0)
         {
-            syslog(LOG_INFO, "sending data back to  %s: %s, %d", client_ip, buffer, (int)bytes_received);
+            // syslog(LOG_INFO, "sending data back to  %s: %s, %d", client_ip, buffer, (int)bytes_received);
             int sendstatus = send(NewSocketfd, buffer, bytes_read, 0); // sending the data read from the file back to the client
             if (sendstatus == -1)
             {
