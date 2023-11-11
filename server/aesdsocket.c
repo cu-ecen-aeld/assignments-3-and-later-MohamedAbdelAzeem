@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
         }
 
         // opening a data file (DATA_FILE) in write-only mode with options to create the file if it doesn't exist and to append data to it.
-        data_fd = open(Datafilename, O_RDWR | O_CREAT | O_APPEND, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP | S_IROTH);
+        data_fd = open(Datafilename, O_RDWR | O_CREAT | O_APPEND, 0644);
         if (data_fd == -1)
         {
             syslog(LOG_ERR, "open error: %s\n", gai_strerror(status));
