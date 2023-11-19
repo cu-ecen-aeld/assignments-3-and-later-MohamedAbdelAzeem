@@ -185,9 +185,10 @@ int main(int argc, char *argv[])
     struct addrinfo hints;
 
     memset(&hints, 0, sizeof hints); // make sure the struct is empty
-    hints.ai_family = AF_INET;     // don't care IPv4 or IPv6
+    hints.ai_family = AF_INET;     //  IPv4 
     hints.ai_socktype = SOCK_STREAM; // TCP stream sockets, SOCK_DGRAM for UDP
     hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+    hints.ai_protocol = 0;          /* Any protocol */
 
     if ((status = getaddrinfo(NULL, "9000", &hints, &servinfo)) != 0)
     {
@@ -228,7 +229,7 @@ int main(int argc, char *argv[])
     // bind to the socket
     if (bind(Socketfd, servinfo->ai_addr, servinfo->ai_addrlen) != 0)
     {
-        perror("bind");
+        perror("bindd");
         syslog(LOG_ERR, "bind error: %s\n", gai_strerror(status));
         cleanup_on_exit();
         exit(1);
