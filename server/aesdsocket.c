@@ -81,11 +81,15 @@ void cleanup_on_exit()
         }
     }
     // Delete the file
-    if (remove(Datafilename) != 0)
+    if(access(Datafilename, F_OK) != -1)
     {
-        perror("Error deleting file");
-        exit(1);
+        if (remove(Datafilename) != 0)
+        {
+            perror("Error deleting data file");
+            exit(1);
+        }
     }
+
     if (flags.logs_flag)
     {
         closelog();
@@ -181,7 +185,7 @@ int main(int argc, char *argv[])
     struct addrinfo hints;
 
     memset(&hints, 0, sizeof hints); // make sure the struct is empty
-    hints.ai_family = AF_UNSPEC;     // don't care IPv4 or IPv6
+    hints.ai_family = AF_INET;     // don't care IPv4 or IPv6
     hints.ai_socktype = SOCK_STREAM; // TCP stream sockets, SOCK_DGRAM for UDP
     hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
 
