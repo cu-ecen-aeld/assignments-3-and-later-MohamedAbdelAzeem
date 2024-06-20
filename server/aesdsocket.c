@@ -22,7 +22,7 @@
 /************ Global variables ***************/
 int Socketfd;
 const char *Datafilename = "/var/tmp/aesdsocketdata";
-struct addrinfo *servinfo; // will point to the results
+struct addrinfo *servinfo = NULL; // will point to the results
 
 int data_fd; // data file to save the data received
 
@@ -51,7 +51,20 @@ typedef struct aesdsocket_flags
 
 aesdsocket_flags flags = {false, false, false, false, false, false, false};
 
+/************ Function Prototypes ************/
 void cleanup_on_exit();
+void *client_handler(void *arg);
+void *timestamp_timer();
+void HandleSignal(int signal);
+int run_daemon(void);
+int setup_server(const char *port);
+void accept_connections(int Socketfd);
+void join_all_threads();
+void thread_ls_insert(pthread_t thread_id);
+void delete_Completed_threads();
+void thread_ls_free();
+void thread_ls_print();
+
 /*********************************************************************/
 /******************** Linked List functions ****************************/
 /*********************************************************************/
@@ -135,6 +148,7 @@ void thread_ls_print()
         return;
     }
 
+    syslog(LOG_INFO, "****************************************");
     // Iterate through the list and print each node's information
     SLIST_FOREACH(node, &head, entries)
     {
@@ -181,7 +195,6 @@ void join_all_threads()
 // Function to add a timestamp to the data file
 void add_timestamp()
 {
-
     time_t current_time;
     struct tm *time_info;
     char time_str[128];
@@ -236,12 +249,9 @@ void *timestamp_timer()
 /*****************************************************************/
 void cleanup_on_exit()
 {
-
-    pthread_mutex_lock(&Timer_mutex);
     ExittimerFlag = 1;
-    pthread_mutex_unlock(&Timer_mutex);
+    syslog(LOG_INFO, "Cleaning up resources");
     syslog(LOG_INFO, "flags: %d, %d, %d, %d, %d, %d", flags.ClientSocket_flag, flags.ServerSocket_flag, flags.buffer_flag, flags.data_file_flag, flags.deamon_mode_flag, ExittimerFlag);
-
     join_all_threads();
 
     thread_ls_free();
@@ -262,6 +272,7 @@ void cleanup_on_exit()
             syslog(LOG_ERR, "Error closing server fd");
             exit(1);
         }
+        flags.ServerSocket_flag = 0;
     }
     if (flags.data_file_flag)
     {
@@ -292,14 +303,11 @@ void HandleSignal(int signal)
 {
     if (signal == SIGINT || signal == SIGTERM)
     {
-
         syslog(LOG_INFO, "Caught signal, exiting");
-
         syslog(LOG_INFO, "Closed connection from %s", client_ip);
-
         cleanup_on_exit();
+        exit(EXIT_SUCCESS);
     }
-    exit(EXIT_SUCCESS);
 }
 
 /**
@@ -336,12 +344,14 @@ int run_daemon(void)
     // Check for session ID failure
     if (session_id < 0)
     {
-        exit(1);
+        exit(EXIT_SUCCESS);
     }
 
     // Change the current working directory to root
-    chdir("/");
-
+    if (chdir("/") < 0)
+    {
+        exit(EXIT_FAILURE);
+    }
     // Close standard file descriptors
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
@@ -350,7 +360,59 @@ int run_daemon(void)
     return 0;
 }
 
-// Function to handle client connections
+/*************** Server Setup *******************/
+int setup_server(const char *port)
+{
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    int status = getaddrinfo(NULL, port, &hints, &servinfo);
+    if (status != 0)
+    {
+        syslog(LOG_ERR, "getaddrinfo error: %s\n", gai_strerror(status));
+        return -1;
+    }
+
+    flags.servinfo_flag = true;
+    Socketfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    if (Socketfd == -1)
+    {
+        syslog(LOG_ERR, "Socket error: %s\n", strerror(errno));
+        return -1;
+    }
+    flags.ServerSocket_flag = true;
+
+    int reuse = 1;
+    if (setsockopt(Socketfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
+    {
+        perror("setsockopt");
+        return -1;
+    }
+
+    if (bind(Socketfd, servinfo->ai_addr, servinfo->ai_addrlen) != 0)
+    {
+        perror("bind");
+        syslog(LOG_ERR, "bind error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    freeaddrinfo(servinfo);
+    flags.servinfo_flag = false;
+
+    if (listen(Socketfd, 5) != 0)
+    {
+        perror("listen");
+        syslog(LOG_ERR, "listen error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return Socketfd;
+}
+
+/*************** Client Handling ****************/
 void *client_handler(void *arg)
 {
 
@@ -412,7 +474,7 @@ void *client_handler(void *arg)
         pthread_exit(NULL);
     }
 
-    syslog(LOG_INFO, "Received data from %s: %s ( %d )", client_ip, buffer, bytes_received);
+    // syslog(LOG_INFO, "Received data from %s: %s ( %d )", client_ip, buffer, bytes_received);
 
     int reposition_status = lseek(data_fd, 0, SEEK_SET); // Reposition the read/write offset of the file to the beginning
     if (reposition_status == -1)
@@ -483,160 +545,34 @@ void *client_handler(void *arg)
     pthread_exit(NULL);
 }
 
-// Main thread
-int main(int argc, char *argv[])
+void accept_connections(int Socketfd)
 {
-
-    // open connection for system logging
-    openlog("Logs", LOG_PID, LOG_USER);
-    syslog(LOG_INFO, "Start logging");
-    flags.logs_flag = true;
-
-    // Register signal handlers for SIGINT and SIGTERM
-    signal(SIGINT, HandleSignal);
-    signal(SIGTERM, HandleSignal);
-
-    if (argc > 1 && strcmp(argv[1], "-d") == 0)
-    {
-        syslog(LOG_INFO, "aesdsocket socket started");
-        flags.deamon_mode_flag = true;
-    }
-    else
-    {
-        syslog(LOG_ERR, "-d isn't passed");
-    }
-
-    // Opens a stream socket bound to port 9000, failing and returning -1 if any of the socket connection steps fail.
-    int status;
-    struct addrinfo hints;
-
-    memset(&hints, 0, sizeof hints); // make sure the struct is empty
-    hints.ai_family = AF_INET;       //  IPv4
-    hints.ai_socktype = SOCK_STREAM; // TCP stream sockets, SOCK_DGRAM for UDP
-    hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
-    hints.ai_protocol = 0;           /* Any protocol */
-
-    if ((status = getaddrinfo(NULL, "9000", &hints, &servinfo)) != 0)
-    {
-        syslog(LOG_ERR, "getaddrinfo error: %s\n", gai_strerror(status));
-        cleanup_on_exit();
-        exit(1);
-    }
-
-    flags.servinfo_flag = true; // set  flags.servinfo_flag = true; to indicate that it need to be freed
-
-    // servinfo now points to a linked list of 1 or more struct addrinfos
-
-    // create a socket
-    /*
-         AF_INET      IPv4 Internet protocols
-         SOCK_DGRAM   UPD
-         SOCK_STREAM  TCP
-    */
-    Socketfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (Socketfd == -1)
-    {
-        syslog(LOG_ERR, "Socket error: %s\n", gai_strerror(status));
-        cleanup_on_exit();
-        exit(1);
-    }
-    syslog(LOG_INFO, "Server Socket created Socketfd = %d", Socketfd);
-    flags.ServerSocket_flag = true;
-
-    // Set SO_REUSEADDR option
-    int reuse = 1;
-    if (setsockopt(Socketfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
-    {
-        perror("setsockopt");
-        cleanup_on_exit();
-        exit(EXIT_FAILURE);
-    }
-
-    // bind to the socket
-    if (bind(Socketfd, servinfo->ai_addr, servinfo->ai_addrlen) != 0)
-    {
-        perror("bindd");
-        syslog(LOG_ERR, "bind error: %s\n", gai_strerror(status));
-        cleanup_on_exit();
-        exit(1);
-    }
-
-    syslog(LOG_INFO, "Bind to the server socket.");
-
-    freeaddrinfo(servinfo); // free the linked-list
-    flags.servinfo_flag = false;
-
-    if (flags.deamon_mode_flag)
-    {
-        int status = run_daemon();
-        if (status == -1)
-        {
-            syslog(LOG_ERR, "Run_daemon error");
-            cleanup_on_exit();
-            exit(1);
-        }
-        syslog(LOG_DEBUG, "Daemon is successfully created ");
-    }
-
-    // Create the timer thread
-    syslog(LOG_INFO, "Creating timer thread...");
-    if (pthread_create(&timer_thread, NULL, timestamp_timer, NULL) != 0)
-    {
-        perror("Error creating timer thread");
-        cleanup_on_exit();
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        pthread_mutex_lock(&Timer_mutex);
-        ExittimerFlag = 0;
-        pthread_mutex_unlock(&Timer_mutex);
-
-        // listen to a connection
-        if (listen(Socketfd, 5) != 0)
-        {
-            perror("listen");
-            syslog(LOG_ERR, "listen error: %s\n", gai_strerror(status));
-            cleanup_on_exit();
-            exit(EXIT_FAILURE);
-        }
-        syslog(LOG_INFO, "Listen on the server socket ");
-    }
-
     while (1)
     {
-
         delete_Completed_threads();
 
-        //  accept the connection
         struct sockaddr_in client_addr;
         unsigned int client_len = sizeof(client_addr);
-        syslog(LOG_INFO, "Wating for new connection...");
 
         int NewSocketfd = accept(Socketfd, (struct sockaddr *)&client_addr, &client_len);
         if (NewSocketfd < 0)
         {
-            syslog(LOG_ERR, "accept error: %s\n", gai_strerror(status));
+            syslog(LOG_ERR, "accept error: %s\n", strerror(errno));
             continue;
         }
-        flags.ClientSocket_flag = true;
-        // extracting the client's IP address from the client_addr structure and converting it from binary form to a string using inet_ntop.
-        inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, MAX_IP_LEN);
 
-        // Logs message to the syslog “Accepted connection from xxx” where XXXX is the IP address of the connected client.
+        inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, MAX_IP_LEN);
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
 
-        // Ensure each thread gets a unique socket descriptor
-        int *thread_socket = malloc(sizeof(int)); // Allocate memory for thread-specific socket descriptor
+        int *thread_socket = malloc(sizeof(int));
         if (!thread_socket)
         {
             syslog(LOG_ERR, "Memory allocation failed");
             close(NewSocketfd);
             continue;
         }
-        *thread_socket = NewSocketfd; // Assign the accepted socket descriptor
+        *thread_socket = NewSocketfd;
 
-        // Create a new thread to handle the client connection
         pthread_t tid;
         if (pthread_create(&tid, NULL, client_handler, thread_socket) != 0)
         {
@@ -645,16 +581,48 @@ int main(int argc, char *argv[])
             free(thread_socket);
             continue;
         }
-        else
-        {
-            // Insert new thread to the linked list
-            thread_ls_insert(tid);
-        }
-        // print linkedlist
+
+        thread_ls_insert(tid);
         thread_ls_print();
     }
+}
+
+/************ Main Function ******************/
+int main(int argc, char *argv[])
+{
+    openlog("Logs", LOG_PID, LOG_USER);
+    syslog(LOG_INFO, "Start logging");
+    flags.logs_flag = true;
+
+    signal(SIGINT, HandleSignal);
+    signal(SIGTERM, HandleSignal);
+
+    if (argc > 1 && strcmp(argv[1], "-d") == 0)
+    {
+        syslog(LOG_INFO, "aesdsocket socket started");
+        if (run_daemon() == -1)
+        {
+            cleanup_on_exit();
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    Socketfd = setup_server("9000");
+    if (Socketfd == -1)
+    {
+        cleanup_on_exit();
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_create(&timer_thread, NULL, timestamp_timer, NULL) != 0)
+    {
+        perror("Error creating timer thread");
+        cleanup_on_exit();
+        exit(EXIT_FAILURE);
+    }
+
+    accept_connections(Socketfd);
 
     closelog();
-
-    exit(0);
+    return 0;
 }
