@@ -1,21 +1,20 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -pthread
 TARGET = aesdsocket
-OBJFILES = aesdsocket.o
+HEADERS =
+OBJECTS = aesdsocket.o
+CFLAGS += -Wall
+LDFLAGS += -pthread
 
-ifdef CROSS_COMPILE
-    CC = $(CROSS_COMPILE)gcc
-endif
+.PHONY: default clean
 
-.PHONY: all clean
+default: $(TARGET)
 
-all: $(TARGET)
+%.o: %.c $(HEADERS)
+	$(CROSS_COMPILE)gcc $(CFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJFILES)
-	$(CC) $(CFLAGS) -o $@ $^
+.PRECIOUS: $(TARGET) $(OBJECTS)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -g -c -o $@ $<
+$(TARGET): $(OBJECTS)
+	$(CROSS_COMPILE)gcc $(OBJECTS) $(LDFLAGS) -o $(TARGET)
 
 clean:
-	rm -f $(TARGET) $(OBJFILES)
+	-rm -f $(TARGET) $(OBJECTS)
