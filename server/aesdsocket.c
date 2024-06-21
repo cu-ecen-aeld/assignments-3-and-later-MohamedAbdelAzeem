@@ -597,15 +597,6 @@ int main(int argc, char *argv[])
     signal(SIGINT, HandleSignal);
     signal(SIGTERM, HandleSignal);
 
-
-
-    Socketfd = setup_server("9000");
-    if (Socketfd == -1)
-    {
-        cleanup_on_exit();
-        exit(EXIT_FAILURE);
-    }
-
     if (argc > 1 && strcmp(argv[1], "-d") == 0)
     {
         syslog(LOG_INFO, "aesdsocket socket started");
@@ -614,6 +605,13 @@ int main(int argc, char *argv[])
             cleanup_on_exit();
             exit(EXIT_FAILURE);
         }
+    }
+
+    Socketfd = setup_server("9000");
+    if (Socketfd == -1)
+    {
+        cleanup_on_exit();
+        exit(EXIT_FAILURE);
     }
 
     if (pthread_create(&timer_thread, NULL, timestamp_timer, NULL) != 0)
