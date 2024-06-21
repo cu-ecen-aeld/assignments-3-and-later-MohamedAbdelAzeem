@@ -1,8 +1,8 @@
-TARGET = aesdsocket
+TARGET ?= aesdsocket
 HEADERS =
 OBJECTS = aesdsocket.o
-CFLAGS += -Wall
-LDFLAGS += -pthread
+CFLAGS ?= -Wall
+LDFLAGS ?= -pthread
 
 .PHONY: default clean
 
