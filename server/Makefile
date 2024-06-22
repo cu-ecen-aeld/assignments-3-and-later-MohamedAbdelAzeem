@@ -1,8 +1,9 @@
+CC ?= $(CROSS_COMPILE)gcc
 TARGET ?= aesdsocket
 HEADERS =
 OBJECTS = aesdsocket.o
-CFLAGS ?= -Wall
-LDFLAGS ?= -pthread
+CFLAGS ?= -g -Wall -Werror
+LDFLAGS ?= -pthread -lrt
 
 .PHONY: default clean
 
