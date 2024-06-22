@@ -243,7 +243,7 @@ void *timestamp_timer()
         }
         pthread_mutex_unlock(&Timer_mutex);
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 /*****************************************************************/
@@ -448,7 +448,7 @@ void *client_handler(void *arg)
         cleanup_on_exit();
         syslog(LOG_INFO, "mutex unlock \n");
         pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-        pthread_exit(NULL);
+        return NULL;
     }
 
     flags.data_file_flag = true;
@@ -471,7 +471,7 @@ void *client_handler(void *arg)
         syslog(LOG_ERR, "recv error: %s\n", strerror(errno));
         syslog(LOG_INFO, "mutex unlock \n");
         pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-        pthread_exit(NULL);
+        return NULL;
     }
 
     // syslog(LOG_INFO, "Received data from %s: %s ( %d )", client_ip, buffer, bytes_received);
@@ -484,7 +484,7 @@ void *client_handler(void *arg)
         cleanup_on_exit();
         syslog(LOG_INFO, "mutex unlock \n");
         pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-        pthread_exit(NULL);
+        return NULL;
     }
 
     memset(buffer, 0, sizeof(char) * BUFFER_SIZE); // clear the buffer
@@ -501,7 +501,7 @@ void *client_handler(void *arg)
             perror("send");
             syslog(LOG_INFO, "mutex unlock \n");
             pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-            pthread_exit(NULL);
+            return NULL;
         }
     }
 
@@ -514,7 +514,7 @@ void *client_handler(void *arg)
         syslog(LOG_ERR, "Error closing client fd");
         syslog(LOG_INFO, "mutex unlock \n");
         pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-        pthread_exit(NULL);
+        return NULL;
     }
     flags.ClientSocket_flag = false;
     if (close(data_fd) == -1)
@@ -523,7 +523,7 @@ void *client_handler(void *arg)
         syslog(LOG_ERR, "Error closing data file");
         syslog(LOG_INFO, "mutex unlock \n");
         pthread_mutex_unlock(&mutex); // Unlock the mutex before returning
-        pthread_exit(NULL);
+        return NULL;
     }
     flags.data_file_flag = false;
     syslog(LOG_INFO, "Closed connection from %s", client_ip);
@@ -542,7 +542,7 @@ void *client_handler(void *arg)
     }
 
     syslog(LOG_INFO, "Thread : %ld Ended\n", tid);
-    pthread_exit(NULL);
+    return NULL;
 }
 
 void accept_connections(int Socketfd)
